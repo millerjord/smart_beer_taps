@@ -48,18 +48,18 @@ pip3 install esphome
 
 Then you will have to create your own secret.yaml-file. This file should contain the following information:
 
-'''
+```
 wifi_ssid: {your wifi name here}
 wifi_password: {your wifi PSK here}
 fallback_password: {fallback password for the ESP}
 esphome_api_password: {API password for connection with HA}
-'''
+```
 
 And finally you just run the code to compile it, and store it to the ESP32 (that you have connected via USB to your computer)
 
-'''
+```
 esphome run tap1.yaml
-'''
+```
 
 ## Still to do
 
