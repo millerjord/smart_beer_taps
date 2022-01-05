@@ -1,0 +1,203 @@
+substitutions: #substitute your own values in this section
+  device_name: tap1
+  device_description: "ePaper display for Taphandle number 1"
+  beer_name: sensor.keg_1_beer #entity from Home Assistant
+  beer_style: sensor.keg_1_style #entity from Home Assistant
+  beer_abv: sensor.keg_1_abv #entity from Home Assistant
+  beer_ebc: sensor.keg_1_ebc #entity from Home Assistant
+  beer_ibu: sensor.keg_1_ibu #entity from Home Assistant
+  beer_brewdate: sensor.keg_1_brewdate #entity from Home Assistant
+  beer_left: sensor.keg_1_weight #entity from Home Assistant
+
+#---------------------------------------------------------------------------------------------
+
+globals:
+  - id: valueCount
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+esphome:
+  name: '${device_name}'
+  comment: '${device_description}'
+  platform: ESP32
+  board: esp32dev
+  on_boot:
+    priority: -100
+    then:
+      - logger.log: "boot ready..."
+      - wait_until: 
+          - lambda: |- 
+              auto time = id(sntp_time).now();
+              return (time.is_valid());
+      - if:
+          condition:
+            - lambda: 'return ((id(sntp_time).now().hour < 22) || (id(sntp_time).now().hour > 6)) ;' # adjust sleep time to hour of the day
+          then:
+            - logger.log: "daytime..."
+            - lambda: 'id(deep_sleep_1).set_sleep_duration(60*1000);'
+          else:
+            - logger.log: "nighttime..."
+            - lambda: 'id(deep_sleep_1).set_sleep_duration(30*60*1000);'
+  on_loop:
+    then:
+      - if:
+          condition:
+            lambda: 'return (id(valueCount) == 7) ;'  # Number of sensors to grab values from
+          then:
+            - logger.log: "all values ready..."
+            - component.update: my_display
+            - deep_sleep.enter: deep_sleep_1
+          else:
+            # - logger.log: "waiting for values..."
+            
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: on #Do not scan for networks  
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: !secret esphome_api_password
+
+ota:
+  safe_mode: true
+  reboot_timeout: 10min
+  num_attempts: 5
+
+time:
+  - platform: sntp
+    id: sntp_time
+  
+
+binary_sensor:
+  - platform: status
+    name: "Tap1 Status"
+
+
+deep_sleep:
+  id: deep_sleep_1
+  sleep_duration: 300s
+  run_duration: 30s
+
+sensor:
+
+  - platform: homeassistant
+    id: beer_abv
+    entity_id: $beer_abv
+    unit_of_measurement: "%"
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+  - platform: homeassistant
+    id: beer_ebc
+    entity_id: $beer_ebc
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+  - platform: homeassistant
+    id: beer_ibu
+    entity_id: $beer_ibu
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+    
+  - platform: homeassistant
+    id: beer_left
+    entity_id: $beer_left
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+  
+text_sensor:
+  - platform: homeassistant
+    id: beer_name
+    entity_id: $beer_name
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+  - platform: homeassistant
+    id: beer_style
+    entity_id: $beer_style
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+  - platform: homeassistant
+    id: beer_brewdate
+    entity_id: $beer_brewdate
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+image:
+  - file: "qr.png"
+    id: qr_code
+    resize: 100x100
+
+font:
+  - file: 'fonts/SourceSansPro-Light.ttf'
+    id: font1
+    size: 12
+  - file: 'fonts/SourceSansPro-SemiBold.ttf'
+    id: font2
+    size: 15
+  - file: 'fonts/SourceSansPro-Bold.ttf'
+    id: font5
+    size: 25
+    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz&.,!%"
+
+spi:
+  clk_pin: 18
+  mosi_pin: 23
+
+display:
+    platform: waveshare_epaper
+    id: my_display
+    cs_pin: 5
+    dc_pin: 17
+    busy_pin: 4
+    reset_pin: 16
+    model: 2.13in-ttgo-dke
+    rotation: 0°
+    full_update_every: 10
+    update_interval: never  # Trigger via component.update instead, when all data is available
+    lambda: |-
+      // Print Beer name and style
+      it.printf(2, 2, id(font5), TextAlign::TOP_LEFT, "%s", id(beer_name).state.c_str());
+      it.printf(2, 50, id(font2), TextAlign::TOP_LEFT, "%s", id(beer_style).state.c_str());
+
+      // Print Beer Vitals
+      it.printf(2, 65, id(font2), TextAlign::TOP_LEFT, "ABV:");
+      it.printf(40, 65, id(font2), TextAlign::TOP_LEFT, "%7.1f %%", id(beer_abv).state);
+
+      it.printf(2, 80, id(font1), TextAlign::TOP_LEFT, "IBU:");
+      it.printf(20, 80, id(font1), TextAlign::TOP_LEFT, "%7.1f", id(beer_ibu).state);
+
+      it.printf(60, 80, id(font1), TextAlign::TOP_LEFT, "EBC:");
+      it.printf(75, 80, id(font1), TextAlign::TOP_LEFT, "%7.1f", id(beer_ebc).state);
+
+      // Print beer left
+      it.rectangle(2, 100, 120, 45);
+      it.printf(30, 100, id(font2), TextAlign::TOP_LEFT, "Beer Left:");
+      it.printf(17, 115, id(font5), TextAlign::TOP_LEFT, "%7.1f l", id(beer_left).state);
+
+      // Print QR code for Untappd
+      it.image(10, 145, id(qr_code));
+
+      // Print time in HH:MM format down right
+      it.strftime(115, 235, id(font1), TextAlign::TOP_RIGHT, "%H:%M", id(sntp_time).now());

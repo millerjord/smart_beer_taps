@@ -46,6 +46,8 @@ You will also need to have installed the ESPhome CLI. You do that by using this 
 pip3 install esphome
 ```
 
+Also, in the top of the tap1.yaml file you will find a list of substitutions. Change these to reflect your environment.
+
 Then you will have to create your own secret.yaml-file. This file should contain the following information:
 
 ```
