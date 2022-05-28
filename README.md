@@ -12,7 +12,7 @@ For measuring the content of the kegs I did find the following project, that inc
 
 https://github.com/Callwater/Beerkeg-load-cell
 
-Since I will use a keezer, and will have (at least) 3 kegs in there, I do now have the DHT22 sensors in my setup. I will rather use an InkBird ITC-308 with wifi to measure that.
+Since I will use a keezer, and will have (at least) 3 kegs in there, I do not have the DHT22 sensors in my setup. I will rather use an InkBird ITC-308 with wifi to measure that.
 
 Then for the taphandles, I decided I wanted to use an eInk display to dynamically show what beers are in the kegs and how much is left. I did find some TTGO T5 with a 2.13 inch eInk display included that works perfectly for me. I bought them off Amazon.
 
@@ -20,7 +20,7 @@ The reason for the eInk display is that it will show data even if the device is 
 
 At home I run Home Assistant for all my home automation. So I have quite a lot of data there, and hence decided to utilize ESPhome in the taphandles. The information about the beers, like ABV, IBU and EBC I do have in a local database, and I have a SQL server sensor in HA that pulls that data in. The scales under the kegs send data via MQTT to Home Assistant. So I have all necessary information in there, which makes it pretty easy to display what is needed.
 
-On the display I am also printing a QR code to Untappd, where I have more information about the beer and I give my friends coming over a chance to rate the beers. Quite fun really. I have seen that there is a PR to ESPhome to generate the QR code, but that isn't merged yet. So for now I am using the qrcode installed via PIP to create a PNG that is printed on the display.
+On the display I am also printing a QR code to Untappd, where I have more information about the beer and I give my friends coming over a chance to rate the beers. Quite fun really. As of a few months ago there is a module to create the QR code within ESPHome. It took me some months to figure out how to use that, since it is not templateable. Got some help on the community forums, and now it is working!
 
 And for the taphandles I did find some STL's at Thingiverse, I have even added them to this repo for simplicity. 
 https://www.thingiverse.com/thing:4891896
@@ -29,16 +29,11 @@ https://www.thingiverse.com/thing:4891896
 
 First of all you will need to 3D print the taphandles. I did scale them to 101%, and then they were easier to fit on the tap, didn't have to re-thread the handle.
 
-You will also need the ESP32 with the eInk screen.
+You will also need the ESP32 with the eInk screen, and it needs to be the 2.13" or you will have to change the output to fit the screen.
 
-If you want to add the QR code on the screen, you will have to manually create it. I did use pythons qrcode, like this:
-```
-pip3 install qrcode
-qr "https://untappd.com/qr/beer/4644786" > qr.png
-```
+For the untappd QR code I have put the entire link in the database about the beer, and read that into the code. 
+
 (When browsing to untappd and selecting a beer, you will see a unique number in the URL. That number is what I have used here.)
-
-The file need to be in the same folder as the tap1.yaml file.
 
 You will also need to have installed the ESPhome CLI. You do that by using this command
 

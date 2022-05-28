@@ -1,5 +1,7 @@
 substitutions: #substitute your own values in this section
   device_name: tap1
+  device_name_status: "Tap 1 Status"
+  device_name_battery: "Tap 1 battery"
   device_description: "ePaper display for Taphandle number 1"
   beer_name: sensor.keg_1_beer #entity from Home Assistant
   beer_style: sensor.keg_1_style #entity from Home Assistant
@@ -8,6 +10,7 @@ substitutions: #substitute your own values in this section
   beer_ibu: sensor.keg_1_ibu #entity from Home Assistant
   beer_brewdate: sensor.keg_1_brewdate #entity from Home Assistant
   beer_left: sensor.keg_1_weight #entity from Home Assistant
+  untappd : sensor.tap_1_untappd #entity from Home Assistant
 
 #---------------------------------------------------------------------------------------------
 
@@ -30,24 +33,32 @@ esphome:
           - lambda: |- 
               auto time = id(sntp_time).now();
               return (time.is_valid());
-      - if:
-          condition:
-            - lambda: 'return ((id(sntp_time).now().hour < 22) || (id(sntp_time).now().hour > 6)) ;' # adjust sleep time to hour of the day
-          then:
-            - logger.log: "daytime..."
-            - lambda: 'id(deep_sleep_1).set_sleep_duration(60*1000);'
-          else:
-            - logger.log: "nighttime..."
-            - lambda: 'id(deep_sleep_1).set_sleep_duration(30*60*1000);'
+# Removed due to impressively bad batterytime
+#      - if:
+#          condition:
+#            - lambda: 'return ((id(sntp_time).now().hour < 22) || (id(sntp_time).now().hour > 6)) ;' # adjust sleep time to hour of the day
+#          then:
+#            - logger.log: "daytime..."
+#            - lambda: 'id(deep_sleep_1).set_sleep_duration(60*1000);'
+#          else:
+#            - logger.log: "nighttime..."
+#            - lambda: 'id(deep_sleep_1).set_sleep_duration(30*60*1000);'
   on_loop:
     then:
       - if:
           condition:
-            lambda: 'return (id(valueCount) == 7) ;'  # Number of sensors to grab values from
+            lambda: 'return (id(valueCount) == 8) ;'  # Number of sensors to grab values from
           then:
             - logger.log: "all values ready..."
             - component.update: my_display
-            - deep_sleep.enter: deep_sleep_1
+            - if:
+                condition:
+                  binary_sensor.is_off: prevent_deep_sleep
+                then:
+                  - deep_sleep.enter: deep_sleep_1
+                else:
+                  - logger.log: "Skipping deep sleep"
+
           else:
             # - logger.log: "waiting for values..."
             
@@ -76,12 +87,17 @@ time:
 
 binary_sensor:
   - platform: status
-    name: "Tap1 Status"
+    name: '${device_name_status}'
+ 
+  - platform: homeassistant
+    id: prevent_deep_sleep
+    name: Prevent Deep Sleep
+    entity_id: input_boolean.prevent_deep_sleep
 
 
 deep_sleep:
   id: deep_sleep_1
-  sleep_duration: 300s
+  sleep_duration: 86400s  # Update automatically every 24h, otherwise press reset button
   run_duration: 30s
 
 sensor:
@@ -118,7 +134,13 @@ sensor:
     on_value:
       then:
         - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
-  
+
+  - platform: adc
+    pin: 35
+    id: "tap1_battery"
+    name: '${device_name_battery}'
+    attenuation: 11db
+
 text_sensor:
   - platform: homeassistant
     id: beer_name
@@ -137,6 +159,14 @@ text_sensor:
         - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
 
   - platform: homeassistant
+    id: beer_untappd
+    entity_id: $untappd
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
+
+  - platform: homeassistant
     id: beer_brewdate
     entity_id: $beer_brewdate
     internal: true
@@ -144,10 +174,9 @@ text_sensor:
       then:
         - lambda: 'id(valueCount) += 1; ESP_LOGD("main", "Value %i received" , id(valueCount));'
 
-image:
-  - file: "qr.png"
-    id: qr_code
-    resize: 100x100
+qr_code:
+  - id: untappd_qr
+    value: beer_untappd
 
 font:
   - file: 'fonts/SourceSansPro-Light.ttf'
@@ -159,7 +188,7 @@ font:
   - file: 'fonts/SourceSansPro-Bold.ttf'
     id: font5
     size: 25
-    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz&.,!%"
+    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz&.,!%:("
 
 spi:
   clk_pin: 18
@@ -197,7 +226,8 @@ display:
       it.printf(17, 115, id(font5), TextAlign::TOP_LEFT, "%7.1f l", id(beer_left).state);
 
       // Print QR code for Untappd
-      it.image(10, 145, id(qr_code));
+      untappd_qr->set_value(id(beer_untappd).state.c_str()); // <-- this line fills the value from the text sensor 
+      it.qr_code(20, 150, id(untappd_qr), Color(255,255,255), 3);
 
       // Print time in HH:MM format down right
       it.strftime(115, 235, id(font1), TextAlign::TOP_RIGHT, "%H:%M", id(sntp_time).now());
