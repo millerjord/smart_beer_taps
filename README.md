@@ -61,3 +61,9 @@ esphome run tap1.yaml
 ## Still to do
 
 I have to find a smart way to wrap the name of the beer over two lines.
+
+## Images of the taps, as of May 28th 2022
+
+![Picture of all the taps in the tower](images/taps.jpg)
+
+![Closeup picture of the display in one of the taps](images/closeup.jpg)
